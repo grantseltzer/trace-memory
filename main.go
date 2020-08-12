@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -12,46 +13,6 @@ import (
 
 	"github.com/iovisor/gobpf/bcc"
 )
-
-//TODO:
-// Return value of mmap is pointer to the region
-
-const eBPF_Program = `
-#include <uapi/linux/ptrace.h>
-
-BPF_HASH(mmap_args, u64, args_t); // for saving mmap args in between enter and return
-BPF_PERF_OUTPUT(events);
-
-typedef struct mmap_args {
-	u32 pid;
-	int fd;
-	void* addr;
-	size_t length;
-	int prot;
-	int flags;
-	off_t offset;
-} args_t;
-
-
-int trace_mmap(struct pt_regs *ctx) {
-
-	args_t args = {};
-	args.pid = (u32)bpf_get_current_pid_tgid();
-	
-	// In kernel 4.17+ the actual context is stored by reference in di register
-	struct pt_regs * actualCtx = (struct pt_regs *)ctx->di;
-	bpf_probe_read(&args.addr, sizeof(args.addr), &actualCtx->di);
-	bpf_probe_read(&args.length, sizeof(args.length), &actualCtx->si);
-	bpf_probe_read(&args.prot, sizeof(args.prot), &actualCtx->dx);
-	bpf_probe_read(&args.flags, sizeof(args.flags), &actualCtx->r10);
-	bpf_probe_read(&args.fd, sizeof(args.fd), &actualCtx->r8);
-	bpf_probe_read(&args.offset, sizeof(args.offset), &actualCtx->r9);
-
-	events.perf_submit(ctx, &args, sizeof(args));
-
-	return 0;
-}
-`
 
 type mmap_args struct {
 	processID uint32
@@ -61,11 +22,13 @@ type mmap_args struct {
 	prot      uint32
 	flags     uint32
 	offset    uint64
+	memAddr   uint64
 }
 
 func (m *mmap_args) unmarshalBinaryData(data []byte) error {
 
-	if len(data) != 44 {
+	if len(data) != 52 {
+		fmt.Println(len(data), data)
 		return errors.New("incorrect number of bytes in binary data for decoding")
 	}
 
@@ -76,26 +39,42 @@ func (m *mmap_args) unmarshalBinaryData(data []byte) error {
 	m.prot = binary.LittleEndian.Uint32(data[24:28])
 	m.flags = binary.LittleEndian.Uint32(data[28:32])
 	m.offset = binary.LittleEndian.Uint64(data[32:40])
+	m.memAddr = binary.LittleEndian.Uint64(data[40:48])
 	return nil
 }
 
 func main() {
 
-	bpfModule := bcc.NewModule(eBPF_Program, []string{})
+	bpfCode, err := ioutil.ReadFile("./monitor.c")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	funcFD, err := bpfModule.LoadKprobe("trace_mmap")
+	bpfModule := bcc.NewModule(string(bpfCode), []string{})
+
+	mmapKprobe, err := bpfModule.LoadKprobe("trace_mmap_enter")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	syscallPrefix := bcc.GetSyscallPrefix()
 
-	err = bpfModule.AttachKprobe(syscallPrefix+"mmap", funcFD, -1)
+	err = bpfModule.AttachKprobe(syscallPrefix+"mmap", mmapKprobe, -1)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	table := bcc.NewTable(bpfModule.TableId("events"), bpfModule)
+	mmapKretprobe, err := bpfModule.LoadKprobe("trace_mmap_return")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = bpfModule.AttachKretprobe(syscallPrefix+"mmap", mmapKretprobe, -1)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	table := bcc.NewTable(bpfModule.TableId("output"), bpfModule)
 	channel := make(chan []byte)
 	perfMap, err := bcc.InitPerfMap(table, channel, nil)
 	if err != nil {
@@ -126,7 +105,7 @@ func main() {
 func printMMapArgs(m *mmap_args) error {
 
 	x := struct {
-		PID, Addr, Length, Protection, Flags, FileDescriptor, Offset string
+		PID, Addr, Length, Protection, Flags, FileDescriptor, Offset, MemoryAddress string
 	}{
 		PID:            fmt.Sprint(m.processID),
 		Addr:           sprintAddr(m.addr),
@@ -135,6 +114,7 @@ func printMMapArgs(m *mmap_args) error {
 		Flags:          sprintMemoryVisibilityFlag(m.flags),
 		FileDescriptor: fmt.Sprint(m.fd),
 		Offset:         fmt.Sprint(m.offset),
+		MemoryAddress:  fmt.Sprintf("%x", m.memAddr),
 	}
 
 	jsonBytes, err := json.Marshal(x)

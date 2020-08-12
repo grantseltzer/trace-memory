@@ -1,4 +1,4 @@
-module github.com/grantseltzer/fucking-around-with-ebpf/read_file_descriptors
+module github.com/grantseltzer/trace-memory
 
 go 1.14
 
