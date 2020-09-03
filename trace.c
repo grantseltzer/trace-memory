@@ -1,0 +1,1 @@
+enum events { MMAP, MUNMAP };

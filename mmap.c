@@ -9,20 +9,16 @@ typedef struct mmap_args {
 	int flags;
 	off_t offset;
     unsigned long return_value;
-} args_t;
+} mmap_args_t;
 
-enum events {
-    MMAP
-};
-
-BPF_HASH(mmap_args, u64, args_t); // for saving mmap args in between enter and return
+BPF_HASH(mmap_args, u64, mmap_args_t); // for saving mmap args in between enter and return
 BPF_PERF_OUTPUT(output);
 
 int trace_mmap_enter(struct pt_regs *ctx) {
 
     u64 id;
     u32 tid;
-    args_t args = {};
+    mmap_args_t args = {};
 
 	args.pid = (u32)bpf_get_current_pid_tgid();
 	
@@ -45,7 +41,7 @@ int trace_mmap_enter(struct pt_regs *ctx) {
 
 int trace_mmap_return(struct pt_regs *ctx) {
 
-    args_t *loaded_args;
+    mmap_args_t *loaded_args;
 
     // determine id
     u32 tid = bpf_get_current_pid_tgid();
@@ -60,7 +56,7 @@ int trace_mmap_return(struct pt_regs *ctx) {
     mmap_args.delete(&id)
 
     loaded_args->return_value = PT_REGS_RC(ctx);
-	output.perf_submit(ctx, loaded_args, sizeof(args_t));
+	output.perf_submit(ctx, loaded_args, sizeof(mmap_args_t));
     
     return 0;
 }
