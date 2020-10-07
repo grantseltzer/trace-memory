@@ -45,7 +45,7 @@ func (m *mmap_args) unmarshalBinaryData(data []byte) error {
 
 func main() {
 
-	bpfCode, err := ioutil.ReadFile("./monitor.c")
+	bpfCode, err := ioutil.ReadFile("./mmap.c")
 	if err != nil {
 		log.Fatal(err)
 	}

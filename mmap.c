@@ -1,4 +1,6 @@
-#include <uapi/linux/ptrace.h>
+#include <linux/ptrace.h>
+
+enum events { MMAP, MUNMAP };
 
 typedef struct mmap_args {
 	u32 pid;
@@ -9,12 +11,43 @@ typedef struct mmap_args {
 	int flags;
 	off_t offset;
     unsigned long return_value;
+    struct mmap_args* next;
 } mmap_args_t;
 
-BPF_HASH(mmap_args, u64, mmap_args_t); // for saving mmap args in between enter and return
+BPF_HASH(mapped_region_cache, u64, mmap_args_t); // for saving mmap args in between enter and return
 BPF_PERF_OUTPUT(output);
 
-int trace_mmap_enter(struct pt_regs *ctx) {
+// WARNING: memory_regions should not be accessed directly!
+BPF_HASH(memory_regions, u32, mmap_args_t);
+
+static __always_inline void insert_mapped_region(u32 pid, mmap_args_t* m) {
+
+    mmap_args_t *mem_list_head = memory_regions.lookup(&pid);
+
+    if (!mem_list_head) {
+        // PID's regions are not known about, insert head of list
+        memory_regions.insert(&pid, m);
+    }
+
+    char inserted = 0;
+    while (mem_list_head->next) {
+
+        if (m->addr < mem_list_head->next->addr) {
+            m->next = mem_list_head->next;
+            mem_list_head->next = m;
+            inserted = 1;
+            break;
+        } else {
+            mem_list_head = mem_list_head->next;
+        }
+    }
+
+    if (inserted == 0) {
+        mem_list_head->next = m;
+    }
+}   
+
+void trace_mmap_enter(struct pt_regs *ctx) {
 
     u64 id;
     u32 tid;
@@ -34,9 +67,7 @@ int trace_mmap_enter(struct pt_regs *ctx) {
     id = MMAP;
     tid = bpf_get_current_pid_tgid();
     id = id << 32 | tid;
-    mmap_args.update(&id, &args);
-
-	return 0;
+    mapped_region_cache.update(&id, &args);
 }
 
 int trace_mmap_return(struct pt_regs *ctx) {
@@ -48,15 +79,20 @@ int trace_mmap_return(struct pt_regs *ctx) {
     u64 id = MMAP;
     id = id << 32 | tid;
 
-    loaded_args = mmap_args.lookup(&id);
+    loaded_args = mapped_region_cache.lookup(&id);
     if (loaded_args == 0) {
         return -1;
     }
 
-    mmap_args.delete(&id)
+    mapped_region_cache.delete(&id);
 
     loaded_args->return_value = PT_REGS_RC(ctx);
+
+    //TODO: instead of perf_submit, call `insert_mapped_region`
+    insert_mapped_region(tid, loaded_args);
 	output.perf_submit(ctx, loaded_args, sizeof(mmap_args_t));
     
     return 0;
 }
+
+
