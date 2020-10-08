@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/list"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -14,18 +15,23 @@ import (
 	"github.com/iovisor/gobpf/bcc"
 )
 
-type mmap_args struct {
-	processID uint32
-	fd        uint32
-	addr      uint64
-	length    uint64
-	prot      uint32
-	flags     uint32
-	offset    uint64
-	memAddr   uint64
+var (
+	memoryRegions *list.List
+)
+
+type mmapArgs struct {
+	processID   uint32
+	fd          uint32
+	addr        uint64
+	length      uint64
+	prot        uint32
+	flags       uint32
+	offset      uint64
+	memAddr     uint64
+	returnValue uint32
 }
 
-func (m *mmap_args) unmarshalBinaryData(data []byte) error {
+func (m *mmapArgs) unmarshalBinaryData(data []byte) error {
 
 	if len(data) != 52 {
 		fmt.Println(len(data), data)
@@ -40,6 +46,8 @@ func (m *mmap_args) unmarshalBinaryData(data []byte) error {
 	m.flags = binary.LittleEndian.Uint32(data[28:32])
 	m.offset = binary.LittleEndian.Uint64(data[32:40])
 	m.memAddr = binary.LittleEndian.Uint64(data[40:48])
+	m.returnValue = binary.LittleEndian.Uint32(data[48:52])
+
 	return nil
 }
 
@@ -58,7 +66,6 @@ func main() {
 	}
 
 	syscallPrefix := bcc.GetSyscallPrefix()
-
 	err = bpfModule.AttachKprobe(syscallPrefix+"mmap", mmapKprobe, -1)
 	if err != nil {
 		log.Fatal(err)
@@ -84,7 +91,7 @@ func main() {
 	go func() {
 		for {
 			value := <-channel
-			mmapInfo := mmap_args{}
+			mmapInfo := mmapArgs{}
 			err = mmapInfo.unmarshalBinaryData(value)
 			if err != nil {
 				log.Fatal(err)
@@ -102,10 +109,15 @@ func main() {
 	<-c
 }
 
-func printMMapArgs(m *mmap_args) error {
+func updateMemoryMappings(m *mmapArgs) {
+	// Ordered insert
+
+}
+
+func printMMapArgs(m *mmapArgs) error {
 
 	x := struct {
-		PID, Addr, Length, Protection, Flags, FileDescriptor, Offset, MemoryAddress string
+		PID, Addr, Length, Protection, Flags, FileDescriptor, Offset, MemoryAddress, ReturnValue string
 	}{
 		PID:            fmt.Sprint(m.processID),
 		Addr:           sprintAddr(m.addr),
@@ -115,6 +127,7 @@ func printMMapArgs(m *mmap_args) error {
 		FileDescriptor: fmt.Sprint(m.fd),
 		Offset:         fmt.Sprint(m.offset),
 		MemoryAddress:  fmt.Sprintf("%x", m.memAddr),
+		ReturnValue:    fmt.Sprintf("%x", m.returnValue),
 	}
 
 	jsonBytes, err := json.Marshal(x)
