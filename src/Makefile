@@ -7,7 +7,7 @@ CLANG ?= clang
 GCC ?= gcc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bin/bpftool
-LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
+LIBBPF_SRC := $(abspath ../tp_src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 INCLUDES := -I$(OUTPUT)
 CFLAGS := -g -O2 -Wall
@@ -22,6 +22,7 @@ COMMON_OBJ = \
 	$(OUTPUT)/syscall_helpers.o \
 	$(OUTPUT)/errno_helpers.o \
 	$(OUTPUT)/map_helpers.o \
+	$(OUTPUT)/sha3_helpers.o \
 	#
 
 .PHONY: all
@@ -71,4 +72,3 @@ $(LIBBPF_OBJ): $(wildcard $(LIBBPF_SRC)/*.[ch]) | $(OUTPUT)/libbpf
 .DELETE_ON_ERROR:
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
-
