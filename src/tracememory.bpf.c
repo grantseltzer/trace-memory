@@ -35,7 +35,6 @@ int tracepoint__syscalls__sys_enter_mmap(struct trace_event_raw_sys_enter *ctx)
 {
     u64 id = bpf_get_current_pid_tgid();
 	u32 tgid = id >> 32;
-	u32 pid = id;
 
     if (!trace_allowed(tgid)) {
         return 1;
@@ -50,15 +49,7 @@ int tracepoint__syscalls__sys_enter_mmap(struct trace_event_raw_sys_enter *ctx)
     args.fd = (int)ctx->args[4];
     args.offset = (off_t)ctx->args[5];
 
-    sha3_context c;
-    uint8_t *hash;
-
-    sha3_Init256(&c);
-    sha3_Update(&c, &args.addr, args.length);
-    hash = (uint8_t*)sha3_Finalize(&c);
-    bpf_trace_printk("%u\n", *hash);
-
-    return bpf_map_update_elem(&mmap_cache, &id, &args, BPF_NOEXIST); 
+   return bpf_map_update_elem(&mmap_cache, &id, &args, BPF_NOEXIST); 
 }
 
 SEC("tracepoint/syscalls/sys_exit_mmap")
@@ -71,7 +62,7 @@ int tracepoint__syscalls__sys_exit_mmap(struct trace_event_raw_sys_exit* ctx)
     u32 tgid = id >> 32;
     args = bpf_map_lookup_elem(&mmap_cache, &id);
     if (!args) {
-        return -1;
+        goto cleanup;
     }
 
     ret = ctx->ret;

@@ -18,6 +18,9 @@
 
 #include "vmlinux.h"
 #include "sha3_helpers.h"
+#include <string.h>
+#include <limits.h>
+#include <errno.h>
 
 #define SHA3_ASSERT( x )
 #if defined(_MSC_VER)
@@ -303,23 +306,4 @@ sha3_Finalize(void *priv)
     SHA3_TRACE_BUF("Hash: (first 32 bytes)", ctx->sb, 256 / 8);
 
     return (ctx->sb);
-}
-
-sha3_return_t sha3_HashBuffer( unsigned bitSize, enum SHA3_FLAGS flags, const void *in, unsigned inBytes, void *out, unsigned outBytes ) {
-    sha3_return_t err;
-    sha3_context c;
-
-    err = sha3_Init(&c, bitSize);
-    if( err != SHA3_RETURN_OK )
-        return err;
-    if( sha3_SetFlags(&c, flags) != flags ) {
-        return SHA3_RETURN_BAD_PARAMS;
-    }
-    sha3_Update(&c, in, inBytes);
-    const void *h = sha3_Finalize(&c);
-
-    if(outBytes > bitSize/8)
-        outBytes = bitSize/8;
-    memcpy(out, h, outBytes);
-    return SHA3_RETURN_OK;
 }

@@ -12,7 +12,7 @@ endif
 .RECIPEPREFIX = >
 
 .PHONY:
-default: src/vmlinux.h .output/libbpf.a install-headers bpf-object gen-skeleton
+default: src/vmlinux.h .output/libbpf.a install-headers bpf-object gen-skeleton compile-helpers finish
 
 .PHONY: src/vmlinux.h
 src/vmlinux.h:
@@ -38,6 +38,19 @@ bpf-object:
 .PHONY: gen-skeleton
 gen-skeleton:
 > bin/bpftool gen skeleton src/.output/tracememory.bpf.o > src/.output/tracememory.skel.h
+
+.PHONY: compile-helpers
+compile-helpers:
+> gcc -g -O2 -Wall -Isrc/.output -c src/trace_helpers.c -o src/.output/trace_helpers.o
+> gcc -g -O2 -Wall -Isrc/.output -c src/syscall_helpers.c -o src/.output/syscall_helpers.o
+> gcc -g -O2 -Wall -Isrc/.output -c src/errno_helpers.c -o src/.output/errno_helpers.o
+> gcc -g -O2 -Wall -Isrc/.output -c src/map_helpers.c -o src/.output/map_helpers.o
+> gcc -g -O2 -Wall -Isrc/.output -c src/tracememory.c -o src/.output/tracememory.o
+
+.PHONY: finish
+finish:
+> gcc -g -O2 -Wall src/.output/exampletracememory.o src/.output/libbpf.a src/.output/trace_helpers.o src/.output/syscall_helpers.o src/.output/errno_helpers.o src/.output/map_helpers.o -lelf -lz -o bin/tracememory
+
 
 .PHONY: clean
 clean:
