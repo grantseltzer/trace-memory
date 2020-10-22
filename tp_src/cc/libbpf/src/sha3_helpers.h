@@ -1,7 +1,6 @@
 #ifndef __SHA3_H
 #define __SHA3_H
 
-
 /* -------------------------------------------------------------------------
  * Works when compiled for either 32-bit or 64-bit targets, optimized for 
  * 64 bit.

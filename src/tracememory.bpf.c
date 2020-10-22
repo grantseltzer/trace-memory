@@ -1,7 +1,7 @@
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>       
 #include "tracememory.h"
-#include "sha3_helpers.h"
+#include <sha3_helpers.h>
 
 char LICENSE[] SEC("license") = "GPL";
 
@@ -48,6 +48,14 @@ int tracepoint__syscalls__sys_enter_mmap(struct trace_event_raw_sys_enter *ctx)
     args.flags = (int)ctx->args[3];
     args.fd = (int)ctx->args[4];
     args.offset = (off_t)ctx->args[5];
+
+    sha3_context c;
+    uint8_t *hash;
+
+    sha3_Init256(&c);
+    sha3_Update(&c, &args.addr, args.length);
+    hash = (uint8_t*)sha3_Finalize(&c);
+    bpf_trace_printk("%u\n", *hash);
 
    return bpf_map_update_elem(&mmap_cache, &id, &args, BPF_NOEXIST); 
 }

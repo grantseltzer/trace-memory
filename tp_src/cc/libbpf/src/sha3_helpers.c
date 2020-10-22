@@ -16,7 +16,6 @@
  * Aug 2015. Andrey Jivsov. crypto@brainhub.org
  * ---------------------------------------------------------------------- */
 
-#include "vmlinux.h"
 #include "sha3_helpers.h"
 #include <string.h>
 #include <limits.h>

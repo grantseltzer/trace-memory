@@ -49,7 +49,7 @@ compile-helpers:
 
 .PHONY: finish
 finish:
-> gcc -g -O2 -Wall src/.output/exampletracememory.o src/.output/libbpf.a src/.output/trace_helpers.o src/.output/syscall_helpers.o src/.output/errno_helpers.o src/.output/map_helpers.o -lelf -lz -o bin/tracememory
+> gcc -g -O2 -Wall src/ src/.output/tracememory.o src/.output/libbpf.a src/.output/trace_helpers.o src/.output/syscall_helpers.o src/.output/errno_helpers.o src/.output/map_helpers.o -lelf -lz -o bin/tracememory
 
 
 .PHONY: clean
