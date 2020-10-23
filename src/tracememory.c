@@ -56,9 +56,40 @@ int libbpf_print_fn(enum libbpf_print_level level,
 	return vfprintf(stderr, format, args);
 }
 
+void sprintMemoryProtectionFlag(int prot, char* protStr) {
+    if (prot == 0x0) {
+        sprintf(protStr, "%s", "NONE");
+    }
+    if ((prot&0x01) == 0x01) {
+        strcat(protStr, "R");
+    }
+    if ((prot&0x02) == 0x02) {
+        strcat(protStr, "W");
+    }
+    if ((prot&0x04) == 0x04) {
+        strcat(protStr, "E");
+    }
+}
+
+void sprintAddr(int addr, char* addrStr) {
+    if (addr == 0) {
+        sprintf(addrStr,"%s", "NULL");
+        return;
+    }
+    sprintf(addrStr, "%x", addr);
+    return;
+}
+
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz) {
     const struct mmap_event *e = data;
-    printf("%lx %ld %d\n", e->args.addr, e->args.length, e->args.fd);
+  
+    char addr[12] = "";
+    sprintAddr(e->args.addr, addr);
+   
+    char prot[20] = "";
+    sprintMemoryProtectionFlag(e->args.prot, prot);
+
+    printf("PID: %d\tAddr: %s\tLen: %ld\tFD: %d\tProt: %s\n", e->pid, addr, e->args.length, e->args.fd, prot);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -130,3 +161,59 @@ cleanup:
 	perf_buffer__free(pb);
 	tracememory_bpf__destroy(obj);
 }
+
+/*
+
+func sprintMemoryVisibilityFlag(vis uint32) string {
+
+	var visibilityFlags []string
+
+	if vis&0x01 == 0x01 {
+		visibilityFlags = []string{"MAP_SHARED"}
+	}
+	if vis&0x02 == 0x02 {
+		visibilityFlags = []string{"MAP_PRIVATE"}
+	}
+	if vis&0x02 == 0x03 {
+		visibilityFlags = []string{"MAP_SHARED_VALIDATE"}
+	}
+	if vis&0x0f == 0x10 {
+		visibilityFlags = []string{"MAP_ANONYMOUS"}
+	}
+	if vis&0x0f == 0x100 {
+		visibilityFlags = []string{"MAP_FIXED"}
+	}
+	if vis&0x0f == 0x40 {
+		visibilityFlags = []string{"MAP_32BIT"}
+	}
+	if vis&0x0f == 0x200000 {
+		visibilityFlags = []string{"MAP_FIXED_NOREPLACE"}
+	}
+	if vis&0x0f == 0x01000 {
+		visibilityFlags = []string{"MAP_GROWSDOWN"}
+	}
+	if vis&0x0f == 0x100000 {
+		visibilityFlags = []string{"MAP_HUGETLB"}
+	}
+	if vis&0x0f == 0x08000 {
+		visibilityFlags = []string{"MAP_LOCKED"}
+	}
+	if vis&0x0f == 0x40000 {
+		visibilityFlags = []string{"MAP_NONBLOCK"}
+	}
+	if vis&0x0f == 0x20000 {
+		visibilityFlags = []string{"MAP_POPULATE"}
+	}
+	if vis&0x0f == 0x10000 {
+		visibilityFlags = []string{"MAP_NORESERVE"}
+	}
+	if vis&0x0f == 0x80000 {
+		visibilityFlags = []string{"MAP_STACK"}
+	}
+	if vis&0x0f == 0x4000000 {
+		visibilityFlags = []string{"MAP_UNINITIALIZED"}
+	}
+
+	return strings.Join(visibilityFlags, "|")
+}
+*/

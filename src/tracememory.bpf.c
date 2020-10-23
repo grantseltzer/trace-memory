@@ -1,7 +1,6 @@
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>       
 #include "tracememory.h"
-#include "sha3_helpers.h"
 
 char LICENSE[] SEC("license") = "GPL";
 
@@ -75,4 +74,3 @@ cleanup:
 	bpf_map_delete_elem(&mmap_cache, &tgid);
 	return 0;
 }
-
