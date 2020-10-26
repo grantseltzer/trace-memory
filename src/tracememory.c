@@ -80,6 +80,66 @@ void sprintAddr(int addr, char* addrStr) {
     return;
 }
 
+
+void sprintMemoryVisibilityFlag(int vis, char* visStr) {
+
+	if ((vis&0x01) == 0x01) {
+		strcat(visStr, " MAP_SHARED");
+	}
+
+	if ((vis&0x02) == 0x02) {
+		strcat(visStr, " MAP_PRIVATE");
+	}
+	
+	if ((vis&0x02) == 0x03) {
+		strcat(visStr, " MAP_SHARED_VALIDATE");
+	}
+
+	if ((vis&0x0f) == 0x10) {
+		strcat(visStr, " MAP_ANONYMOUS");
+	}
+
+	if ((vis&0x0f) == 0x100) {
+		strcat(visStr, " MAP_FIXED");
+	}
+		
+	if ((vis&0x0f) == 0x40) {
+		strcat(visStr, " MAP_32BIT");
+	}
+	
+	if ((vis&0x0f) == 0x200000) {
+		strcat(visStr, " MAP_FIXED_NOREPLACE");
+	}
+
+	if ((vis&0x0f) == 0x01000) {
+		strcat(visStr, " MAP_GROWSDOWN");
+	}
+
+	if ((vis&0x0f) == 0x100000) {
+		strcat(visStr, " MAP_HUGETLB");
+	}		
+
+	if ((vis&0x0f) == 0x08000) {
+		strcat(visStr, " MAP_LOCKED");
+	}
+
+	if ((vis&0x0f) == 0x40000) {
+		strcat(visStr, " MAP_NONBLOCK");
+	}
+	if ((vis&0x0f) == 0x20000) {
+		strcat(visStr, " MAP_POPULATE");
+	}
+	if ((vis&0x0f) == 0x10000) {
+		strcat(visStr, " MAP_NORESERVE");
+	}
+	if ((vis&0x0f) == 0x80000) {
+		strcat(visStr, " MAP_STACK");
+	}
+	if ((vis&0x0f) == 0x4000000) {
+		strcat(visStr, " MAP_UNINITIALIZED");
+	}
+}
+
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz) {
     const struct mmap_event *e = data;
   
@@ -89,7 +149,10 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz) {
     char prot[20] = "";
     sprintMemoryProtectionFlag(e->args.prot, prot);
 
-    printf("PID: %d\tAddr: %s\tLen: %ld\tFD: %d\tProt: %s\n", e->pid, addr, e->args.length, e->args.fd, prot);
+	char vis[50] = "";
+	sprintMemoryVisibilityFlag(e->args.flags, vis);
+
+    printf("PID: %d\tAddr: %s\tLen: %ld\tFD: %d\tProt: %s\tVisibility: %s\n", e->pid, addr, e->args.length, e->args.fd, prot, vis);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -161,59 +224,3 @@ cleanup:
 	perf_buffer__free(pb);
 	tracememory_bpf__destroy(obj);
 }
-
-/*
-
-func sprintMemoryVisibilityFlag(vis uint32) string {
-
-	var visibilityFlags []string
-
-	if vis&0x01 == 0x01 {
-		visibilityFlags = []string{"MAP_SHARED"}
-	}
-	if vis&0x02 == 0x02 {
-		visibilityFlags = []string{"MAP_PRIVATE"}
-	}
-	if vis&0x02 == 0x03 {
-		visibilityFlags = []string{"MAP_SHARED_VALIDATE"}
-	}
-	if vis&0x0f == 0x10 {
-		visibilityFlags = []string{"MAP_ANONYMOUS"}
-	}
-	if vis&0x0f == 0x100 {
-		visibilityFlags = []string{"MAP_FIXED"}
-	}
-	if vis&0x0f == 0x40 {
-		visibilityFlags = []string{"MAP_32BIT"}
-	}
-	if vis&0x0f == 0x200000 {
-		visibilityFlags = []string{"MAP_FIXED_NOREPLACE"}
-	}
-	if vis&0x0f == 0x01000 {
-		visibilityFlags = []string{"MAP_GROWSDOWN"}
-	}
-	if vis&0x0f == 0x100000 {
-		visibilityFlags = []string{"MAP_HUGETLB"}
-	}
-	if vis&0x0f == 0x08000 {
-		visibilityFlags = []string{"MAP_LOCKED"}
-	}
-	if vis&0x0f == 0x40000 {
-		visibilityFlags = []string{"MAP_NONBLOCK"}
-	}
-	if vis&0x0f == 0x20000 {
-		visibilityFlags = []string{"MAP_POPULATE"}
-	}
-	if vis&0x0f == 0x10000 {
-		visibilityFlags = []string{"MAP_NORESERVE"}
-	}
-	if vis&0x0f == 0x80000 {
-		visibilityFlags = []string{"MAP_STACK"}
-	}
-	if vis&0x0f == 0x4000000 {
-		visibilityFlags = []string{"MAP_UNINITIALIZED"}
-	}
-
-	return strings.Join(visibilityFlags, "|")
-}
-*/
